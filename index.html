@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Smart Parking Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background: #f2f2f2;
+        padding: 20px;
+    }
+    h1 { text-align: center; }
+
+    .grid {
+        display: grid;
+        gap: 20px;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    }
+
+    .card {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+    }
+    table, th, td {
+        border: 1px solid #ccc;
+        padding: 8px;
+    }
+</style>
+
+</head>
+<body>
+
+<h1>Smart Parking Dashboard</h1>
+
+<div class="grid">
+    <div class="card">
+        <h2>Total Cars Inside</h2>
+        <h1 id="totalCars">0</h1>
+    </div>
+
+    <div class="card">
+        <h2>Slot Status</h2>
+        <p>Slot 1: <span id="slot1">Loading...</span></p>
+        <p>Slot 2: <span id="slot2">Loading...</span></p>
+        <p>Slot 3: <span id="slot3">Loading...</span></p>
+        <p>Slot 4: <span id="slot4">Loading...</span></p>
+    </div>
+
+    <div class="card">
+        <h2>Real-Time Graph</h2>
+        <canvas id="carChart"></canvas>
+    </div>
+
+    <div class="card">
+        <h2>Real-Time Logs</h2>
+        <ul id="logs"></ul>
+    </div>
+
+    <div class="card" style="grid-column: span 2;">
+        <h2>History Table</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Slot</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                    <th>Time</th>
+                </tr>
+            </thead>
+            <tbody id="historyTable"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+/* ---------------------- FIREBASE SETTINGS ---------------------- */
+const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    databaseURL: "YOUR_DATABASE_URL",
+};
+
+/* Initialize Firebase */
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+/* UI Elements */
+const totalCars = document.getElementById("totalCars");
+const slot1 = document.getElementById("slot1");
+const slot2 = document.getElementById("slot2");
+const slot3 = document.getElementById("slot3");
+const slot4 = document.getElementById("slot4");
+const logs = document.getElementById("logs");
+const historyTable = document.getElementById("historyTable");
+
+/* ---------------------- REAL-TIME LISTENERS ---------------------- */
+
+db.ref("parking").on("value", (snapshot) => {
+    const data = snapshot.val();
+    if (!data) return;
+
+    slot1.innerText = data.slot1.status;
+    slot2.innerText = data.slot2.status;
+    slot3.innerText = data.slot3.status;
+    slot4.innerText = data.slot4.status;
+
+    /* Count Cars */
+    let total = 0;
+    if (data.slot1.status === "Occupied") total++;
+    if (data.slot2.status === "Occupied") total++;
+    if (data.slot3.status === "Occupied") total++;
+    if (data.slot4.status === "Occupied") total++;
+
+    totalCars.innerText = total;
+
+    /* Logs */
+    const log = document.createElement("li");
+    log.innerText = `Updated: ${new Date().toLocaleTimeString()}`;
+    logs.prepend(log);
+
+    /* History Table */
+    historyTable.innerHTML = `
+        <tr><td>1</td><td>${data.slot1.status}</td><td>${data.slot1.date}</td><td>${data.slot1.time}</td></tr>
+        <tr><td>2</td><td>${data.slot2.status}</td><td>${data.slot2.date}</td><td>${data.slot2.time}</td></tr>
+        <tr><td>3</td><td>${data.slot3.status}</td><td>${data.slot3.date}</td><td>${data.slot3.time}</td></tr>
+        <tr><td>4</td><td>${data.slot4.status}</td><td>${data.slot4.date}</td><td>${data.slot4.time}</td></tr>
+    `;
+
+    /* Graph Data */
+    addGraphData(total);
+});
+
+
+/* ---------------------- GRAPH ---------------------- */
+const ctx = document.getElementById("carChart").getContext("2d");
+
+const carChart = new Chart(ctx, {
+    type: "line",
+    data: {
+        labels: [],
+        datasets: [
+            {
+                label: "Cars Inside",
+                data: [],
+                borderWidth: 2
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            y: { beginAtZero: true }
+        }
+    }
+});
+
+function addGraphData(value) {
+    if (carChart.data.labels.length > 20) {
+        carChart.data.labels.shift();
+        carChart.data.datasets[0].data.shift();
+    }
+
+    carChart.data.labels.push(new Date().toLocaleTimeString());
+    carChart.data.datasets[0].data.push(value);
+
+    carChart.update();
+}
+
+</script>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+</body>
+</html>
