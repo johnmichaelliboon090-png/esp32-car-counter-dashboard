@@ -16,8 +16,8 @@ body {
     padding: 20px;
 }
 
-h1 { 
-    text-align: center; 
+h1 {
+    text-align: center;
     color: #00eaff;
     text-shadow: 0 0 15px #00eaff;
 }
@@ -41,69 +41,81 @@ h2 {
     text-shadow: 0 0 10px #00eaff;
 }
 
-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 15px;
+/* SLOT UI */
+.slot {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #0b1020;
+    padding: 12px 16px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    font-size: 18px;
 }
 
-th, td {
-    border: 1px solid #00eaff50;
-    padding: 10px;
-    text-align: center;
-}
-
-th {
-    background: #00eaff20;
+.badge {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-weight: bold;
+    background: gray;
+    color: white;
 }
 
 .free {
-    color: #00ff88;
-    font-weight: bold;
+    background: #00ff88;
+    color: #003320;
+    box-shadow: 0 0 10px #00ff88;
 }
 
 .occupied {
-    color: #ff3c3c;
-    font-weight: bold;
+    background: #ff4444;
+    color: #330000;
+    box-shadow: 0 0 10px #ff4444;
 }
 </style>
 </head>
 
 <body>
 
-<h1>Smart Parking Dashboard</h1>
+<h1>🚗 Smart Parking Dashboard</h1>
 
 <div class="grid">
 
+    <!-- TOTAL CARS -->
     <div class="card">
         <h2>Total Cars Inside</h2>
-        <h1 id="totalCars" style="font-size:45px;text-align:center;">0</h1>
+        <h1 id="totalCars" style="text-align:center;font-size:48px;">0</h1>
     </div>
 
+    <!-- SLOT STATUS -->
     <div class="card">
         <h2>Slot Status</h2>
-        <p>Slot 1: <span id="slot1">Loading...</span></p>
-        <p>Slot 2: <span id="slot2">Loading...</span></p>
-        <p>Slot 3: <span id="slot3">Loading...</span></p>
-        <p>Slot 4: <span id="slot4">Loading...</span></p>
+
+        <div class="slot">
+            <span>Slot 1</span>
+            <span id="slot1" class="badge">Loading...</span>
+        </div>
+
+        <div class="slot">
+            <span>Slot 2</span>
+            <span id="slot2" class="badge">Loading...</span>
+        </div>
+
+        <div class="slot">
+            <span>Slot 3</span>
+            <span id="slot3" class="badge">Loading...</span>
+        </div>
+
+        <div class="slot">
+            <span>Slot 4</span>
+            <span id="slot4" class="badge">Loading...</span>
+        </div>
     </div>
 
+    <!-- GRAPH -->
     <div class="card">
         <h2>Real-Time Car Count</h2>
         <canvas id="carChart"></canvas>
-    </div>
-
-    <div class="card" style="grid-column: span 2;">
-        <h2>Live History</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>Slot</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody id="historyTable"></tbody>
-        </table>
     </div>
 
 </div>
@@ -118,85 +130,78 @@ const firebaseConfig = {
   apiKey: "AIzaSyBf1PpD2Td4gE0hXR_iBdz2Iv_kbiGV7Zo",
   authDomain: "parkinglot-faed9.firebaseapp.com",
   databaseURL: "https://parkinglot-faed9-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "parkinglot-faed9"
+  projectId: "parkinglot-faed9",
+  storageBucket: "parkinglot-faed9.firebasestorage.app",
+  messagingSenderId: "1045359755272",
+  appId: "1:1045359755272:web:cf2263fe90db41b98c91bd"
 };
 
-// Initialize Firebase
+// Init Firebase
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// UI Elements
-const totalCars = document.getElementById("totalCars");
-const slotEls = [
-    document.getElementById("slot1"),
-    document.getElementById("slot2"),
-    document.getElementById("slot3"),
-    document.getElementById("slot4")
+// UI refs
+const slots = [
+  document.getElementById("slot1"),
+  document.getElementById("slot2"),
+  document.getElementById("slot3"),
+  document.getElementById("slot4")
 ];
-const historyTable = document.getElementById("historyTable");
+const totalCars = document.getElementById("totalCars");
 
-// ---------------- REALTIME LISTENER ----------------
-db.ref("Parking").on("value", snapshot => {
-    const data = snapshot.val();
-    if (!data) return;
+// ---------------- REALTIME LISTENERS ----------------
+let carCount = 0;
 
-    let count = 0;
-    historyTable.innerHTML = "";
+for (let i = 1; i <= 4; i++) {
+  db.ref(`/Parking/Sensor${i}/status`).on("value", snap => {
+    const status = snap.val() || "Free";
+    const badge = slots[i-1];
 
-    for (let i = 1; i <= 4; i++) {
-        const sensor = data["Sensor" + i];
-        if (!sensor) continue;
+    badge.textContent = status;
+    badge.className = "badge " + (status === "Occupied" ? "occupied" : "free");
 
-        const status = sensor.status || "Unknown";
-        slotEls[i-1].innerText = status;
-        slotEls[i-1].className = status === "Occupied" ? "occupied" : "free";
+    updateTotal();
+  });
+}
 
-        if (status === "Occupied") count++;
-
-        historyTable.innerHTML += `
-            <tr>
-                <td>${i}</td>
-                <td class="${status === "Occupied" ? "occupied" : "free"}">
-                    ${status}
-                </td>
-            </tr>
-        `;
-    }
-
-    totalCars.innerText = count;
-    updateGraph(count);
-});
+// Count total occupied
+function updateTotal() {
+  carCount = 0;
+  slots.forEach(b => {
+    if (b.textContent === "Occupied") carCount++;
+  });
+  totalCars.textContent = carCount;
+  updateGraph(carCount);
+}
 
 // ---------------- GRAPH ----------------
 const ctx = document.getElementById("carChart").getContext("2d");
 const carChart = new Chart(ctx, {
-    type: "line",
-    data: {
-        labels: [],
-        datasets: [{
-            label: "Cars Inside",
-            data: [],
-            borderColor: "#00eaff",
-            borderWidth: 3,
-            tension: 0.3
-        }]
-    },
-    options: {
-        responsive: true,
-        scales: {
-            y: { beginAtZero: true, stepSize: 1 }
-        }
-    }
+  type: "line",
+  data: {
+    labels: [],
+    datasets: [{
+      label: "Cars Inside",
+      data: [],
+      borderColor: "#00eaff",
+      borderWidth: 3,
+      tension: 0.3
+    }]
+  },
+  options: {
+    responsive: true,
+    scales: { y: { beginAtZero: true, stepSize: 1 } }
+  }
 });
 
 function updateGraph(value) {
-    if (carChart.data.labels.length > 15) {
-        carChart.data.labels.shift();
-        carChart.data.datasets[0].data.shift();
-    }
-    carChart.data.labels.push(new Date().toLocaleTimeString());
-    carChart.data.datasets[0].data.push(value);
-    carChart.update();
+  if (carChart.data.labels.length > 20) {
+    carChart.data.labels.shift();
+    carChart.data.datasets[0].data.shift();
+  }
+  carChart.data.labels.push(new Date().toLocaleTimeString());
+  carChart.data.datasets[0].data.push(value);
+  carChart.update();
 }
 </script>
 
