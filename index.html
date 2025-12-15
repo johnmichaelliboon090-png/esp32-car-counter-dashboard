@@ -4,61 +4,71 @@
 <meta charset="UTF-8">
 <title>Smart Parking Dashboard</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+
+<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-    body {
-        font-family: Arial, sans-serif;
-        background: #0d0f18;
-        color: white;
-        padding: 20px;
-    }
+body {
+    font-family: Arial, sans-serif;
+    background: #0d0f18;
+    color: white;
+    padding: 20px;
+}
 
-    h1 { 
-        text-align: center; 
-        color: #00eaff;
-        text-shadow: 0 0 15px #00eaff;
-    }
+h1 { 
+    text-align: center; 
+    color: #00eaff;
+    text-shadow: 0 0 15px #00eaff;
+}
 
-    .grid {
-        display: grid;
-        gap: 20px;
-        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-    }
+.grid {
+    display: grid;
+    gap: 20px;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
 
-    .card {
-        background: #11141f;
-        padding: 20px;
-        border-radius: 15px;
-        box-shadow: 0 0 18px rgba(0, 238, 255, 0.3);
-        border: 1px solid #00eaff60;
-    }
+.card {
+    background: #11141f;
+    padding: 20px;
+    border-radius: 15px;
+    box-shadow: 0 0 18px rgba(0, 238, 255, 0.3);
+    border: 1px solid #00eaff60;
+}
 
-    h2 {
-        color: #00eaff;
-        text-shadow: 0 0 10px #00eaff;
-    }
+h2 {
+    color: #00eaff;
+    text-shadow: 0 0 10px #00eaff;
+}
 
-    table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 15px;
-        color: white;
-    }
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
 
-    th, td {
-        border: 1px solid #00eaff50;
-        padding: 10px;
-        text-align: center;
-    }
+th, td {
+    border: 1px solid #00eaff50;
+    padding: 10px;
+    text-align: center;
+}
 
-    th {
-        background: #00eaff20;
-    }
+th {
+    background: #00eaff20;
+}
 
+.free {
+    color: #00ff88;
+    font-weight: bold;
+}
+
+.occupied {
+    color: #ff3c3c;
+    font-weight: bold;
+}
 </style>
-
 </head>
+
 <body>
 
 <h1>Smart Parking Dashboard</h1>
@@ -84,14 +94,12 @@
     </div>
 
     <div class="card" style="grid-column: span 2;">
-        <h2>History Table</h2>
+        <h2>Live History</h2>
         <table>
             <thead>
                 <tr>
                     <th>Slot</th>
                     <th>Status</th>
-                    <th>Date</th>
-                    <th>Time</th>
                 </tr>
             </thead>
             <tbody id="historyTable"></tbody>
@@ -105,16 +113,12 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"></script>
 
 <script>
-// ---------------------- YOUR FIREBASE CONFIG ----------------------
+// ---------------- FIREBASE CONFIG ----------------
 const firebaseConfig = {
   apiKey: "AIzaSyBf1PpD2Td4gE0hXR_iBdz2Iv_kbiGV7Zo",
   authDomain: "parkinglot-faed9.firebaseapp.com",
   databaseURL: "https://parkinglot-faed9-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "parkinglot-faed9",
-  storageBucket: "parkinglot-faed9.firebasestorage.app",
-  messagingSenderId: "1045359755272",
-  appId: "1:1045359755272:web:cf2263fe90db41b98c91bd",
-  measurementId: "G-PE7YEMWZCC"
+  projectId: "parkinglot-faed9"
 };
 
 // Initialize Firebase
@@ -123,36 +127,47 @@ const db = firebase.database();
 
 // UI Elements
 const totalCars = document.getElementById("totalCars");
-const slot1 = document.getElementById("slot1");
-const slot2 = document.getElementById("slot2");
-const slot3 = document.getElementById("slot3");
-const slot4 = document.getElementById("slot4");
+const slotEls = [
+    document.getElementById("slot1"),
+    document.getElementById("slot2"),
+    document.getElementById("slot3"),
+    document.getElementById("slot4")
+];
 const historyTable = document.getElementById("historyTable");
 
-// ---------------------- REAL-TIME LISTENER ----------------------
-db.ref("parking").on("value", (snapshot) => {
+// ---------------- REALTIME LISTENER ----------------
+db.ref("Parking").on("value", snapshot => {
     const data = snapshot.val();
     if (!data) return;
 
-    slot1.innerText = data.slot1.status;
-    slot2.innerText = data.slot2.status;
-    slot3.innerText = data.slot3.status;
-    slot4.innerText = data.slot4.status;
+    let count = 0;
+    historyTable.innerHTML = "";
 
-    totalCars.innerText = data.totalCars ?? 0;
+    for (let i = 1; i <= 4; i++) {
+        const sensor = data["Sensor" + i];
+        if (!sensor) continue;
 
-    // History table
-    historyTable.innerHTML = `
-        <tr><td>1</td><td>${data.slot1.status}</td><td>${data.slot1.date}</td><td>${data.slot1.time}</td></tr>
-        <tr><td>2</td><td>${data.slot2.status}</td><td>${data.slot2.date}</td><td>${data.slot2.time}</td></tr>
-        <tr><td>3</td><td>${data.slot3.status}</td><td>${data.slot3.date}</td><td>${data.slot3.time}</td></tr>
-        <tr><td>4</td><td>${data.slot4.status}</td><td>${data.slot4.date}</td><td>${data.slot4.time}</td></tr>
-    `;
+        const status = sensor.status || "Unknown";
+        slotEls[i-1].innerText = status;
+        slotEls[i-1].className = status === "Occupied" ? "occupied" : "free";
 
-    updateGraph(data.totalCars);
+        if (status === "Occupied") count++;
+
+        historyTable.innerHTML += `
+            <tr>
+                <td>${i}</td>
+                <td class="${status === "Occupied" ? "occupied" : "free"}">
+                    ${status}
+                </td>
+            </tr>
+        `;
+    }
+
+    totalCars.innerText = count;
+    updateGraph(count);
 });
 
-// ---------------------- GRAPH ----------------------
+// ---------------- GRAPH ----------------
 const ctx = document.getElementById("carChart").getContext("2d");
 const carChart = new Chart(ctx, {
     type: "line",
@@ -168,12 +183,14 @@ const carChart = new Chart(ctx, {
     },
     options: {
         responsive: true,
-        scales: { y: { beginAtZero: true } }
+        scales: {
+            y: { beginAtZero: true, stepSize: 1 }
+        }
     }
 });
 
 function updateGraph(value) {
-    if (carChart.data.labels.length > 20) {
+    if (carChart.data.labels.length > 15) {
         carChart.data.labels.shift();
         carChart.data.datasets[0].data.shift();
     }
@@ -181,7 +198,6 @@ function updateGraph(value) {
     carChart.data.datasets[0].data.push(value);
     carChart.update();
 }
-
 </script>
 
 </body>
